@@ -129,6 +129,7 @@ void wPrintSections(char **names, WINDOW *win, unsigned int num){
 
     /* Display Sections in a given window, and allow scrolling */
     /* Tristan pretty much made this function */
+    /* Refactor and make less annoying*/
 
     int start = 0;
     int end = 20;
