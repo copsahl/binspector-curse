@@ -1,4 +1,3 @@
-/* TODO: Allow user to select section to print. This was my idea.*/
 #include <stdio.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,7 +13,9 @@
 #include <ncurses.h>
 
 char **getSectionNames(bfd *file, unsigned int num);
+asymbol **getSymbolNames(bfd *file, long *storeSymAmnt);
 void wPrintSections(char **names, WINDOW *win, unsigned int num);
+void wPrintSymbols(WINDOW *win, asymbol **table, long tableSize);
 WINDOW *create_newwin(int height, int width, int starty, int startx);
 
 int main(int argc, char **argv){
@@ -31,9 +32,11 @@ int main(int argc, char **argv){
     bfd *binary;
     const bfd_arch_info_type *archInfo;
     char **sectionNames;
+    asymbol **symbolTable;
     int i;
     unsigned int c;
-    unsigned int nos;
+    unsigned int numberOfSections;
+    long numberOfSymbols;
 
     keypad(stdscr, true);
     // Checking arguments
@@ -64,7 +67,7 @@ int main(int argc, char **argv){
     wmove(instruct, 0, 0);
     wprintw(instruct, "Help:");
     wmove(instruct, 1, 1);
-    wprintw(instruct, "s = List Sections\tq = Quit");
+    wprintw(instruct, "s = List Sections\tS = List Symbols\tq = Quit");
     wrefresh(instruct);
 
     // Initial design for output
@@ -78,28 +81,26 @@ int main(int argc, char **argv){
     wmove(input, 1, 1);
     wrefresh(input);
 
-
-
-    // Parse Arguments
     
-    /*  
-	We loop through each argument and execute their specific
-	functionality when we come across the arguments. 
-    */
+    /*  We loop through each argument and execute their specific functionality when we come across the arguments. */
+
     while(c != 'q'){
-	wmove(stdscr, 32, 3);
-	wrefresh(input);
-	c = getch();
-	switch(c){
-	    case 's':
-		nos = bfd_count_sections(binary);
-		sectionNames = getSectionNames(binary, nos);
-		//wprint_section_names(binary, output);
-		//wrefresh(output);
-		//wrefresh(input);
-		wPrintSections(sectionNames, output, nos);
-		break;
-	}
+        wmove(stdscr, 32, 3);
+        wrefresh(input);
+        c = getch();
+        switch(c){
+            case 's':
+                // Display section names
+                numberOfSections = bfd_count_sections(binary);
+                sectionNames = getSectionNames(binary, numberOfSections);
+                wPrintSections(sectionNames, output, numberOfSections);
+                break;
+            case 'S':
+                // Display symbol names 
+                symbolTable = getSymbolNames(binary, &numberOfSymbols);
+                wPrintSymbols(output, symbolTable, numberOfSymbols);
+                break;
+        }
     } 
 
     // Close the binary, be nice to the computer :) 
@@ -125,10 +126,33 @@ char **getSectionNames(bfd *file, unsigned int num){
     return tmpList;
 }
 
+asymbol **getSymbolNames(bfd *file, long *storeSymAmnt){
+
+    long storageNeeded;
+    long iterator;
+    asymbol **tmpTable;
+
+    storageNeeded = bfd_get_symtab_upper_bound(file);
+    if(storageNeeded <= 0){
+        return NULL;
+    }
+
+    tmpTable = (asymbol **)malloc(storageNeeded);
+    if(tmpTable == NULL){
+        return NULL;
+    }
+    *storeSymAmnt = bfd_canonicalize_symtab(file, tmpTable);
+    if(*storeSymAmnt < 0){
+        return NULL;
+    }
+
+    return tmpTable;
+}
+
 void wPrintSections(char **names, WINDOW *win, unsigned int num){
 
     /* Display Sections in a given window, and allow scrolling */
-    /* Tristan pretty much made this function */
+    /* Refactor and make less annoying*/
 
     int start = 0;
     int end = 20;
@@ -140,41 +164,89 @@ void wPrintSections(char **names, WINDOW *win, unsigned int num){
     }
 
     while(inputChar != 'q'){
-	/* display sections */
-	j = 2;
-	wclear(win);	
-	box(win, 0,0);
-	wmove(win, 0,0);
-	wprintw(win, "Sections:");
-	for(i = start; i <= end; i++){
-	    wmove(win, j, 2); 
-	    wprintw(win, "%s", names[i]);
-	    j++;
-	}
-	wrefresh(win);
-	inputChar = getch();
-	switch(inputChar){
-	    case KEY_DOWN:	// Scroll down
-		if(end != num - 1){
-		    start++;
-		    end++;
-		}
-		break;
+        /* display sections */
+        j = 2;
+        wclear(win);	
+        box(win, 0,0);
+        wmove(win, 0,0);
+        wprintw(win, "Sections:");
+        for(i = start; i <= end; i++){
+            wmove(win, j, 2); 
+            wprintw(win, "%s", names[i]);
+            j++;
+        }
+        wrefresh(win);
+        inputChar = getch();
+        switch(inputChar){
+            case KEY_DOWN:	// Scroll down
+                if(end != num - 1){
+                    start++;
+                    end++;
+                }
+                break;
 
-	    case KEY_UP:	// Scroll up
-		if(start != 0){
-		    start--;
-		    end--;
-		}
-		break;
-	}
+            case KEY_UP:	// Scroll up
+                if(start != 0){
+                    start--;
+                    end--;
+                }
+                break;
+        }
+    }
+    return;
+}
+
+void wPrintSymbols(WINDOW *win, asymbol **table, long tableSize){
+
+    /* Display the symbol names form the table */
+
+    long iterator;
+    long iteratorTwo;
+    long start = 0;
+    long end = 20;
+    int inputChar = '0';
+
+
+    if(tableSize < end){
+        end = tableSize;
     }
 
-    return;
-
+    while(inputChar != 'q'){
+        iteratorTwo = 2;
+        wclear(win);
+        box(win, 0, 0);
+        wmove(win, 0, 0);
+        wprintw(win, "Symbols:");
+        iterator = 0;
+        for(iterator = start; iterator < end; iterator++){
+            wmove(win, iteratorTwo, 2);
+            wprintw(win, "%s", table[iterator]->name);
+            iteratorTwo++;
+        }
+        wrefresh(win);
+        inputChar = getch();
+        switch(inputChar){
+            case KEY_DOWN:
+                if(end != tableSize - 1){
+                    start++;
+                    end++;
+                }
+                break;
+            case KEY_UP:
+                if(start != 0){
+                    start--;
+                    end--;
+                }
+                break;
+        }
+    }
+   return; 
 }
 
 WINDOW *create_newwin(int height, int width, int starty, int startx){
+
+    /* Create a new window */
+
     WINDOW *local_win;
     local_win = newwin(height, width, starty, startx);
     box(local_win, 0, 0);
