@@ -16,6 +16,7 @@ char **getSectionNames(bfd *file, unsigned int num);
 asymbol **getSymbolNames(bfd *file, long *storeSymAmnt);
 void wPrintSections(char **names, WINDOW *win, unsigned int num);
 void wPrintSymbols(WINDOW *win, asymbol **table, long tableSize);
+void wPrintFunctions(WINDOW *win, asymbol **table, long tableSize);
 WINDOW *create_newwin(int height, int width, int starty, int startx);
 
 int main(int argc, char **argv){
