@@ -16,6 +16,7 @@ char **getSectionNames(bfd *file, unsigned int num);
 asymbol **getSymbolNames(bfd *file, long *storeSymAmnt);
 void wPrintSections(char **names, WINDOW *win, unsigned int num);
 void wPrintSymbols(WINDOW *win, asymbol **table, long tableSize);
+void wPrintFunctions(WINDOW *win, asymbol **table, long tableSize);
 WINDOW *create_newwin(int height, int width, int starty, int startx);
 
 int main(int argc, char **argv){
@@ -26,7 +27,7 @@ int main(int argc, char **argv){
 
     WINDOW *output = create_newwin(25, 60, 5, 1);
     WINDOW *input = create_newwin(3, 6, 31, 1);
-    WINDOW *instruct = create_newwin(3, 60, 1, 1);
+    WINDOW *instruct = create_newwin(3, 85, 1, 1);
 
     bfd_init();
     bfd *binary;
@@ -67,7 +68,7 @@ int main(int argc, char **argv){
     wmove(instruct, 0, 0);
     wprintw(instruct, "Help:");
     wmove(instruct, 1, 1);
-    wprintw(instruct, "s = List Sections\tS = List Symbols\tq = Quit");
+    wprintw(instruct, "s = List Sections\tS = List Symbols\tf = List Functions\tq = Quit");
     wrefresh(instruct);
 
     // Initial design for output
@@ -81,7 +82,7 @@ int main(int argc, char **argv){
     wmove(input, 1, 1);
     wrefresh(input);
 
-    
+   symbolTable = getSymbolNames(binary, &numberOfSymbols); 
     /*  We loop through each argument and execute their specific functionality when we come across the arguments. */
 
     while(c != 'q'){
@@ -97,9 +98,11 @@ int main(int argc, char **argv){
                 break;
             case 'S':
                 // Display symbol names 
-                symbolTable = getSymbolNames(binary, &numberOfSymbols);
                 wPrintSymbols(output, symbolTable, numberOfSymbols);
                 break;
+	    case 'f':
+		wPrintFunctions(output, symbolTable, numberOfSymbols);
+		break;
         }
     } 
 
@@ -241,6 +244,52 @@ void wPrintSymbols(WINDOW *win, asymbol **table, long tableSize){
         }
     }
    return; 
+}
+
+void wPrintFunctions(WINDOW *win, asymbol **table, long tableSize){
+
+    long iterator;
+    long iteratorTwo;
+    long start = 0;
+    long end = 20;
+    int inputChar = '0';
+
+
+    if(tableSize < end){
+        end = tableSize;
+    }
+
+    while(inputChar != 'q'){
+        iteratorTwo = 2;
+        wclear(win);
+        box(win, 0, 0);
+        wmove(win, 0, 0);
+        wprintw(win, "Functions:");
+        iterator = 0;
+        for(iterator = start; iterator < end; iterator++){
+	    if(table[iterator]->flags & BSF_FUNCTION){
+		wmove(win, iteratorTwo, 2);
+		wprintw(win, "%s", table[iterator]->name);
+		iteratorTwo++;
+	    }
+	}
+	wrefresh(win);
+        inputChar = getch();
+        switch(inputChar){
+            case KEY_DOWN:
+                if(end != tableSize - 1){
+                    start++;
+                    end++;
+                }
+                break;
+            case KEY_UP:
+                if(start != 0){
+                    start--;
+                    end--;
+                }
+                break;
+        }
+    }
 }
 
 WINDOW *create_newwin(int height, int width, int starty, int startx){
